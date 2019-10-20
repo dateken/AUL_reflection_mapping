@@ -1,0 +1,42 @@
+--track0:オフセット,0,100,2,0.1
+--track1:空間サイズ,0,10000,0,1
+
+obj.effect()
+obj.setoption("antialias",0)
+obj.setoption("shadow",0)
+
+
+cam = obj.getoption("camera_param")
+local radius = obj.track1
+
+if obj.track1 == 0 then
+    radius = 10.0*cam.d
+end
+
+--file:
+obj.load("image",file)
+
+local sW = obj.w/4
+local sH = obj.h/3
+local sW2 = obj.w
+local sH2 = obj.w
+local ofs = obj.track0
+
+local v1 = {}
+v1[1] = {    -radius,-radius,radius,    radius,-radius,radius,    radius,radius,radius,    -radius,radius,radius}
+v1[2] = {    radius,-radius,radius,    radius,-radius,-radius,    radius,radius,-radius,    radius,radius,radius}
+v1[3] = {    radius,-radius,-radius,    -radius,-radius,-radius,    -radius,radius,-radius,    radius,radius,-radius}
+v1[4] = {    -radius,-radius,-radius,    -radius,-radius,radius,    -radius,radius,radius,    -radius,radius,-radius}
+
+local v2 = {-radius,-radius,radius,-radius,-radius,-radius,radius,-radius,-radius,radius,-radius,radius}
+local v3 = {radius,radius,radius,radius,radius,-radius,-radius,radius,-radius,-radius,radius,radius}
+
+local c = {}
+for i=0,3 do
+    c = v1[i+1]
+    obj.drawpoly(cam.x+c[1],cam.y+c[2],cam.z+c[3], cam.x+c[4],cam.y+c[5],cam.z+c[6], cam.x+c[7],cam.y+c[8],cam.z+c[9], cam.x+c[10],cam.y+c[11],cam.z+c[12], i*sW+ofs,sH+ofs, (i+1)*sW-ofs,sH+ofs, (i+1)*sW-ofs,2*sH-ofs, i*sW+ofs,2*sH-ofs)
+    if i == 1 then
+        obj.drawpoly(cam.x+v2[1],cam.y+v2[2],cam.z+v2[3], cam.x+v2[4],cam.y+v2[5],cam.z+v2[6], cam.x+v2[7],cam.y+v2[8],cam.z+v2[9], cam.x+v2[10],cam.y+v2[11],cam.z+v2[12], i*sW+ofs,0+ofs, (i+1)*sW-ofs,0+ofs, (i+1)*sW-ofs,sH-ofs, i*sW+ofs,sH-ofs)
+        obj.drawpoly(cam.x+v3[1],cam.y+v3[2],cam.z+v3[3], cam.x+v3[4],cam.y+v3[5],cam.z+v3[6], cam.x+v3[7],cam.y+v3[8],cam.z+v3[9], cam.x+v3[10],cam.y+v3[11],cam.z+v3[12], i*sW+ofs,2*sH+ofs, (i+1)*sW-ofs,2*sH+ofs, (i+1)*sW-ofs,(3*sH)-ofs, i*sW+ofs,(3*sH)-ofs) 
+    end
+end
