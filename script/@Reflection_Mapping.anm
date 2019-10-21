@@ -1,3 +1,5 @@
+@Reflection_Mapping
+
 --ベクトル・クォータニオン関連の関数読み込み
 local vop = require("vector_operation")
 
