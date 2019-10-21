@@ -39,7 +39,7 @@ ___
 ## 動作環境
 AviUtl version 1.00, 1.10
 
-拡張編集Plugin version 0.92, 0.93rc1 で動作確認しています．
+拡張編集Plugin version 0.92, 0.93rc1
 
 ## バグ報告，コメント等
 https://github.com/dateken/AUL_reflection_mapping へお願いいたします．
