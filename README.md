@@ -5,7 +5,7 @@ AviUtlの拡張編集用の鏡面反射スクリプトです
 "Clone or download" ボタンをクリックし，"Download ZIP" を選択してダウンロードしてください．
 
 ## インストール
-ダウンロードされたzipファイルを解凍し，script内のファイルをAviUtlのscript内へコピーしてください．
+ダウンロードされたzipファイルを解凍し，scriptフォルダ内のファイルをAviUtlのscriptフォルダへコピーしてください．
 
 ## 使い方
 ### @Cube_Mapping
