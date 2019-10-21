@@ -1,7 +1,7 @@
 @Reflection_Mapping
 
 
---ベクトル・クォータニオン関連の関数読み込み
+--ベクトル関連の関数読み込み
 local vop = require("vector_operation")
 
 --track0:オフセット,0,10,2,0.1
@@ -9,7 +9,7 @@ local vop = require("vector_operation")
 --file:
 
 --初期化
-obj.setoption("antialias",1)
+obj.setoption("antialias",0)
 obj.setoption("shadow",1)
 
 --座標軸
