@@ -5,7 +5,6 @@
 local vop = require("vector_operation")
 
 --track0:オフセット,0,10,2,0.1
---track1:空間サイズ,0,10000,0,1
 --check0:裏面を計算する,1
 --file:
 
@@ -151,11 +150,7 @@ if (obj.check0 or drawflag) then
     local sW = obj.w/4
     local sH = obj.h/3
     local ofs = obj.track0
-    local radius = obj.track1
-
-    if obj.track1 == 0 then
-        radius = 10.0*cam.d
-    end
+    local radius = 10.0*cam.d
 
     local v1 = {}
     v1[1] = {    -radius,-radius,radius,    radius,-radius,radius,    radius,radius,radius,    -radius,radius,radius}
