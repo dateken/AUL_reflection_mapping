@@ -1,0 +1,250 @@
+@Reflection_Polyhedron
+
+--file:
+
+--check0:裏面を計算,0
+
+--track0:オフセット,0,10,2,0.1
+
+--track1:type,1,133,1,1
+
+
+--ベクトル関連の関数読み込み
+local vop = require("vector_operation")
+local pol = require("polyhedron_reader")
+
+local v,f = pol.read(math.floor(obj.track1))
+
+--初期化
+obj.setoption("focus_mode","fixed_size")
+obj.setoption("antialias",1)
+obj.setoption("shadow",1)
+
+--座標軸
+local pxvec = {1,0,0}
+local pyvec = {0,1,0}
+local pzvec = {0,0,1}
+local nxvec = {-1,0,0}
+local nyvec = {0,-1,0}
+local nzvec = {0,0,-1}
+
+--カメラ情報取得
+local cam = obj.getoption("camera_param")
+
+--オブジェクト情報を取得
+local objzoom = obj.getvalue("zoom")/100.0
+local objw = obj.w
+local objh = obj.h
+local rw = objw/2.0
+local rh = objh/2.0
+local mergin = 2
+
+--オブジェクトのクォータニオン
+local qx = vop.qt(pxvec,obj.rx)
+local qy = vop.qt(pyvec,obj.ry)
+local qz = vop.qt(pzvec,obj.rz)
+local qxy = vop.qq(qx,qy)
+local qxyz = vop.qq(qxy,qz)
+
+--オブジェクトの逆回転クォータニオン
+local rqx = vop.qt(nxvec,obj.rx)
+local rqy = vop.qt(nyvec,obj.ry)
+local rqz = vop.qt(nzvec,obj.rz)
+local rqxy = vop.qq(rqx,rqy)
+local rqxyz = vop.qq(rqxy,rqz)
+
+for vn = 1, #v do
+    v[vn] = {v[vn][1]*rw,v[vn][2]*rh,v[vn][3]*math.max(rw,rh)}
+end
+
+--オブジェクト座標に中心座標cx,cy,czを反映
+local objcpos = {obj.cx,obj.cy,obj.cz}
+objcpos = vop.rotate(objcpos,rqxyz)
+local objpos = {obj.x,obj.y,obj.z}
+objpos = vop.add(objpos,objcpos)
+
+for fn = 1, (#f) do
+    local vave = {0.0,0.0,0.0}
+    for fi = 1, #f[fn] do
+        vave = vop.add(vave,v[f[fn][fi]])
+    end
+
+    vave[1] = vave[1]/#f[fn]
+    vave[2] = vave[2]/#f[fn]
+    vave[3] = vave[3]/#f[fn]
+    
+    local objvec = {}
+    objvec[1] = vave
+
+    for i=1,(#f[fn]) do
+        objvec[i+1] = v[f[fn][i]]
+    end
+    
+    --法線ベクトル
+    local n = vop.cross(vop.sub(v[f[fn][2]],v[f[fn][1]]),vop.sub(v[f[fn][3]],v[f[fn][1]]))
+
+    n = vop.rotate(n,qxyz)
+    n = vop.unit(n)
+
+    local drawflag = false
+
+    --反射ベクトル
+    local refvec = {}
+    for i=1,(#objvec) do
+        local targetvec = vop.add(vop.rotate(objvec[i],qxyz),objpos)
+        local eyevec = {targetvec[1] - cam.x, targetvec[2] - cam.y, targetvec[3] - cam.z}
+
+        if i == 1 then
+            eyevec = vop.unit(eyevec)
+        end
+
+        local neyevec = {-eyevec[1],-eyevec[2],-eyevec[3]}
+        local rgain = 2.0*vop.dot(n,neyevec)
+        local nvec = {rgain*n[1],rgain*n[2],rgain*n[3]}
+
+        if (rgain >= 0) then
+            drawflag = true
+        end
+
+        refvec[i] = vop.add(eyevec,nvec)
+        
+        if i == 1 then
+            refvec[i] = vop.unit(refvec[i])
+        end
+    end
+    
+    if (obj.check0 or drawflag) then
+        local ncrossref = vop.cross(pzvec,refvec[1])
+        local ndotref = vop.dot(pzvec,refvec[1])
+        local thetaref = 180*math.acos(ndotref)/math.pi
+
+        if ncrossref[1] == 0.0 and ncrossref[2] == 0.0 and ncrossref[3] == 0.0 then
+            ncrossref = {cam.ux,cam.uy,cam.uz}
+        end
+        --反射先をtempbufferの正面に回転するクォータニオン
+        local refq = vop.qt(ncrossref,-thetaref)
+
+        --参照先の座標と画像サイズを算出
+        local maxtx = 0
+        local maxty = 0
+
+        local tvec = {}
+
+        for i=1,(#refvec) do
+            tvec[i] = vop.rotate(refvec[i],refq)
+            if i>1 and tvec[i][3] > 0 then
+                local tgain = 1024.0/tvec[i][3]
+
+                for j=1,3 do
+                    tvec[i][j] = tgain*tvec[i][j]
+                end
+
+                local abstx = math.abs(tvec[i][1])
+                if abstx > maxtx then
+                    maxtx = abstx
+                end
+
+                local absty = math.abs(tvec[i][2])
+                if absty > maxty then
+                    maxty = absty
+                end
+            end
+        end
+    
+        local cubew = maxtx*2
+        local cubeh = maxty*2
+
+        obj.setoption("blend",0,"force")
+        obj.setoption("drawtarget","tempbuffer",cubew,cubeh)
+        obj.load("image",file)
+
+        local sW = obj.w/4
+        local sH = obj.h/3
+        local ofs = obj.track0
+        local radius = 10.0*cam.d
+
+        local v1 = {}
+        v1[1] = {    -radius,-radius,radius,    radius,-radius,radius,    radius,radius,radius,    -radius,radius,radius}
+        v1[2] = {    radius,-radius,radius,    radius,-radius,-radius,    radius,radius,-radius,    radius,radius,radius}
+        v1[3] = {    radius,-radius,-radius,    -radius,-radius,-radius,    -radius,radius,-radius,    radius,radius,-radius}
+        v1[4] = {    -radius,-radius,-radius,    -radius,-radius,radius,    -radius,radius,radius,    -radius,radius,-radius}
+
+        local v2 = {-radius,-radius,radius,-radius,-radius,-radius,radius,-radius,-radius,radius,-radius,radius}
+        local v3 = {radius,radius,radius,radius,radius,-radius,-radius,radius,-radius,-radius,radius,radius}
+
+        local camvec = {0.0 , 0.0, -1024.0}
+
+        --draw cube map
+        for i=0,3 do
+            local sdvec = {}
+            local idx1,idx2,idx3
+            for j=0,3 do
+                idx1,idx2,idx3 = j*3+1,j*3+2,j*3+3
+                local tsd = vop.rotate({v1[i+1][idx1],v1[i+1][idx2],v1[i+1][idx3]},refq)
+
+                sdvec[idx1] = tsd[1] + camvec[1]
+                sdvec[idx2] = tsd[2] + camvec[2]
+                sdvec[idx3] = tsd[3] + camvec[3]
+            end
+
+            obj.drawpoly(sdvec[1],sdvec[2],sdvec[3],sdvec[4],sdvec[5],sdvec[6],sdvec[7],sdvec[8],sdvec[9],sdvec[10],sdvec[11],sdvec[12], i*sW+ofs,sH+ofs, (i+1)*sW-ofs,sH+ofs, (i+1)*sW-ofs,2*sH-ofs, i*sW+ofs,2*sH-ofs)
+
+            if i == 1 then
+                local upvec = {}
+                local dnvec = {}
+        
+                for j=0,3 do
+                    idx1,idx2,idx3 = j*3+1,j*3+2,j*3+3
+
+                    local tup = vop.rotate({v2[idx1],v2[idx2],v2[idx3]},refq)
+                    upvec[idx1] = tup[1] + camvec[1]
+                    upvec[idx2] = tup[2] + camvec[2]
+                    upvec[idx3] = tup[3] + camvec[3]
+
+                    local tdn = vop.rotate({v3[idx1],v3[idx2],v3[idx3]},refq)
+                    dnvec[idx1] = tdn[1] + camvec[1]
+                    dnvec[idx2] = tdn[2] + camvec[2]
+                    dnvec[idx3] = tdn[3] + camvec[3]
+                end
+
+                obj.drawpoly(upvec[1],upvec[2],upvec[3],upvec[4],upvec[5],upvec[6],upvec[7],upvec[8],upvec[9],upvec[10],upvec[11],upvec[12], i*sW+ofs,0+ofs, (i+1)*sW-ofs,0+ofs, (i+1)*sW-ofs,sH-ofs, i*sW+ofs,sH-ofs)
+                obj.drawpoly(dnvec[1],dnvec[2],dnvec[3],dnvec[4],dnvec[5],dnvec[6],dnvec[7],dnvec[8],dnvec[9],dnvec[10],dnvec[11],dnvec[12], i*sW+ofs,2*sH+ofs, (i+1)*sW-ofs,2*sH+ofs, (i+1)*sW-ofs,(3*sH)-ofs, i*sW+ofs,(3*sH)-ofs)
+            end
+        end
+
+        --キューブマップからオブジェクトの矩形を描画
+        obj.load("tempbuffer")
+        obj.setoption("drawtarget","framebuffer")
+
+        if ((#f[fn]) == 3) then
+            local vo1 = v[f[fn][1]]
+            local vo2 = v[f[fn][2]]
+            local vo3 = v[f[fn][3]]
+        
+            obj.drawpoly(vo1[1],vo1[2],vo1[3],vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3], tvec[2][1]+obj.w/2.0,tvec[2][2]+obj.h/2.0,tvec[2][1]+obj.w/2.0,tvec[2][2]+obj.h/2.0,tvec[3][1]+obj.w/2.0,tvec[3][2]+obj.h/2.0,tvec[4][1]+obj.w/2.0,tvec[4][2]+obj.h/2.0)
+        else if ((#f[fn]) == 4) then
+            local vo1 = v[f[fn][1]]
+            local vo2 = v[f[fn][2]]
+            local vo3 = v[f[fn][3]]
+            local vo4 = v[f[fn][4]]
+
+            obj.drawpoly(vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3], vo4[1],vo4[2],vo4[3],tvec[2][1]+obj.w/2.0,tvec[2][2]+obj.h/2.0,tvec[3][1]+obj.w/2.0,tvec[3][2]+obj.h/2.0,tvec[4][1]+obj.w/2.0,tvec[4][2]+obj.h/2.0,tvec[5][1]+obj.w/2.0,tvec[5][2]+obj.h/2.0)
+        else
+            for i=1,#f[fn] do
+                local ti = i + 1
+                
+                if ti > #f[fn] then
+                    ti = 1
+                end
+
+                local vo1 = vave
+                local vo2 = v[f[fn][i]]
+                local vo3 = v[f[fn][ti]]
+                obj.drawpoly(vo1[1],vo1[2],vo1[3],vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3], obj.w/2.0,obj.h/2.0,obj.w/2.0,obj.h/2.0,tvec[i+1][1]+obj.w/2.0,tvec[i+1][2]+obj.h/2.0,tvec[ti+1][1]+obj.w/2.0,tvec[ti+1][2]+obj.h/2.0)
+            end
+        end
+
+        obj.setoption("blend",0,"force")
+    end
+end
+end

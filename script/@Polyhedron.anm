@@ -1,0 +1,130 @@
+@Polyhedron
+--track0:type,1,133,1,1
+
+--color:0xffffff
+
+--check0:裏面を計算,0
+
+--ベクトル関連の関数読み込み
+local vop = require("vector_operation")
+local pol = require("polyhedron_reader")
+
+local v,f = pol.read(math.floor(obj.track0))
+
+--初期化
+obj.setoption("focus_mode","fixed_size")
+obj.setoption("antialias",1)
+obj.setoption("shadow",1)
+
+--座標軸
+local pxvec = {1,0,0}
+local pyvec = {0,1,0}
+local pzvec = {0,0,1}
+local nxvec = {-1,0,0}
+local nyvec = {0,-1,0}
+local nzvec = {0,0,-1}
+
+--カメラ情報取得
+local cam = obj.getoption("camera_param")
+
+--オブジェクト情報を取得
+local objw = obj.w
+local objh = obj.h
+local rw = objw/2.0
+local rh = objh/2.0
+
+--オブジェクトのクォータニオン
+local qx = vop.qt(pxvec,obj.rx)
+local qy = vop.qt(pyvec,obj.ry)
+local qz = vop.qt(pzvec,obj.rz)
+local qxy = vop.qq(qx,qy)
+local qxyz = vop.qq(qxy,qz)
+
+--オブジェクトの逆回転クォータニオン
+local rqx = vop.qt(nxvec,obj.rx)
+local rqy = vop.qt(nyvec,obj.ry)
+local rqz = vop.qt(nzvec,obj.rz)
+local rqxy = vop.qq(rqx,rqy)
+local rqxyz = vop.qq(rqxy,rqz)
+
+for vn = 1, #v do
+    v[vn] = {v[vn][1]*rw,v[vn][2]*rh,v[vn][3]*math.max(rw,rh)}
+end
+
+--オブジェクト座標に中心座標cx,cy,czを反映
+local objcpos = {obj.cx,obj.cy,obj.cz}
+objcpos = vop.rotate(objcpos,rqxyz)
+local objpos = {obj.x,obj.y,obj.z}
+objpos = vop.add(objpos,objcpos)
+
+for fn = 1, (#f) do
+    local vave = {0.0,0.0,0.0}
+    for fi = 1, #f[fn] do
+        vave = vop.add(vave,v[f[fn][fi]])
+    end
+
+    vave[1] = vave[1]/#f[fn]
+    vave[2] = vave[2]/#f[fn]
+    vave[3] = vave[3]/#f[fn]
+    
+    local objvec = {}
+    objvec[1] = vave
+
+    for i=1,(#f[fn]) do
+        objvec[i+1] = v[f[fn][i]]
+    end
+    
+    --法線ベクトル
+    local n = vop.cross(vop.sub(v[f[fn][2]],v[f[fn][1]]),vop.sub(v[f[fn][3]],v[f[fn][1]]))
+    n = vop.rotate(n,qxyz)
+    n = vop.unit(n)
+
+    local drawflag = false
+
+    for i=1,(#objvec) do
+        local targetvec = vop.add(vop.rotate(objvec[i],qxyz),objpos)
+        local eyevec = {targetvec[1] - cam.x, targetvec[2] - cam.y, targetvec[3] - cam.z}
+        local neyevec = {-eyevec[1],-eyevec[2],-eyevec[3]}
+        local rgain = 2.0*vop.dot(n,neyevec)
+        
+        if (rgain >= 0) then
+            drawflag = true
+        end
+    end
+    
+    if (obj.check0 or drawflag) then
+        
+        obj.setoption("drawtarget","framebuffer)--tempbuffer",objw,objh)
+        obj.load("figure","四角形",color,100)
+
+        if ((#f[fn]) == 3) then
+            local vo1 = v[f[fn][1]]
+            local vo2 = v[f[fn][2]]
+            local vo3 = v[f[fn][3]]
+        
+            obj.drawpoly(vo1[1],vo1[2],vo1[3],vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3])--, tvec[2][1]+obj.w/2.0,tvec[2][2]+obj.h/2.0,tvec[2][1]+obj.w/2.0,tvec[2][2]+obj.h/2.0,tvec[3][1]+obj.w/2.0,tvec[3][2]+obj.h/2.0,tvec[4][1]+obj.w/2.0,tvec[4][2]+obj.h/2.0)
+        else if ((#f[fn]) == 4) then
+            local vo1 = v[f[fn][1]]
+            local vo2 = v[f[fn][2]]
+            local vo3 = v[f[fn][3]]
+            local vo4 = v[f[fn][4]]
+
+            obj.drawpoly(vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3], vo4[1],vo4[2],vo4[3])--,tvec[2][1]+obj.w/2.0,tvec[2][2]+obj.h/2.0,tvec[3][1]+obj.w/2.0,tvec[3][2]+obj.h/2.0,tvec[4][1]+obj.w/2.0,tvec[4][2]+obj.h/2.0,tvec[5][1]+obj.w/2.0,tvec[5][2]+obj.h/2.0)
+        else
+            for i=1,#f[fn] do
+                local ti = i + 1
+                
+                if ti > #f[fn] then
+                    ti = 1
+                end
+
+                local vo1 = vave
+                local vo2 = v[f[fn][i]]
+                local vo3 = v[f[fn][ti]]
+                --obj.drawpoly(vo1[1],vo1[2],vo1[3],vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3], tvec[1][1]+obj.w/2.0,tvec[1][2]+obj.h/2.0,tvec[1][1]+obj.w/2.0,tvec[1][2]+obj.h/2.0,tvec[i][1]+obj.w/2.0,tvec[i][2]+obj.h/2.0,tvec[ti][1]+obj.w/2.0,tvec[ti][2]+obj.h/2.0)
+                obj.drawpoly(vo1[1],vo1[2],vo1[3],vo1[1],vo1[2],vo1[3], vo2[1],vo2[2],vo2[3], vo3[1],vo3[2],vo3[3])--, obj.w/2.0,obj.h/2.0,obj.w/2.0,obj.h/2.0,tvec[i+1][1]+obj.w/2.0,tvec[i+1][2]+obj.h/2.0,tvec[ti+1][1]+obj.w/2.0,tvec[ti+1][2]+obj.h/2.0)
+            end
+        end
+    end
+end
+end
